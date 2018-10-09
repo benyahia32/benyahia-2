@@ -1,14 +1,14 @@
-const cacheName = "restaurant-v1";
-const offlineUrl = "index.html";
+const staticCacheName = 'restaurant-reviews-v3';
 
-self.addEventListener("install", event => {
- const urlsToCache = [
-           offlineUrl,
-           "./",
+self.addEventListener('install', function(event) {
+  // console.log("Service Worker installed");
+  event.waitUntil(
+    caches.open(staticCacheName).then(function(cache) {
+      return cache.addAll([
+              "./",
            "./index.html",
            "./restaurant.html",
            "./css/styles.css",
-           "./data/restaurants.json",
            './js/idb.js',
            "./js/dbhelper.js",
            "./js/main.js",
@@ -45,7 +45,6 @@ self.addEventListener("install", event => {
            "./images/9-1600_large.jpg",
            "./images/9-400_small.jpg",
            "./images/9-800_medium.jpg",
-           './img/marker-icon-2x-red.png',
            "./restaurant.html?id=1",
            "./restaurant.html?id=2",
            "./restaurant.html?id=3",
@@ -59,66 +58,51 @@ self.addEventListener("install", event => {
            'http://localhost:1337/restaurants/',
            'https://unpkg.com/leaflet@1.3.1/dist/leaflet.js',
            'https://unpkg.com/leaflet@1.3.1/dist/leaflet.css'
- ];
-
- event.waitUntil(
-   caches.open(cacheName).then(cache => cache.addAll(urlsToCache))
-                         .catch(error => console.error('Cache Open failed in service worker', error))
- );
+      ]);
+    })
+  );
+  // console.log("cache successful");
 });
 
-
- self.addEventListener("activate", event => {
-        event.waitUntil(
-            caches.keys().then(cacheNames => {
-                return Promise.all(
-                    cacheNames.filter(cacheName => {
-                        return cacheName.startsWith("restaurant-") &&
-                            cacheName != staticCacheName
-                    }).map(cacheName => {
-                        return caches.delete(cacheName);
-                    })
-                )
-            })
-        );
-    });
-
- 
-self.addEventListener("fetch", event => {
- event.respondWith(
-   // check to see whether the request exists in the cache or not
-   caches.match(event.request).then(response => {
-     if (response) {
-       return response;
-     }
-
-   // if it doesn't exist, add response into the cache
-   // in the case of failed fetch, fall back to cached offline source
-     const fetchRequest = event.request.clone();
-
-     return fetch(fetchRequest)
-       .then(response => {
-         if (!response || response.status !== 200) {
-           return response;
-         }
-
-         const responseToCache = response.clone();
-
-         caches.open(cacheName).then(cache => {
-           cache.put(event.request, responseToCache);
-         });
-
-         return response;
-       })
-       .catch(error => {
-         if (
-           event.request.method === "GET" &&
-           event.request.headers.get("accept").includes("text/html")
-         ) {
-           return caches.match(offlineUrl);
-         }
-       });
-   })
- );
+// deletes old cache
+self.addEventListener('activate', function(event) {
+  // console.log("Service Worker activated");
+  event.waitUntil(
+    caches.keys().then(function(cacheNames) {
+      return Promise.all(
+        cacheNames.filter(function(cacheName) {
+          return cacheName.startsWith('restaurant-reviews-') &&
+                 cacheName != staticCacheName;
+        }).map(function(cacheName) {
+          return caches.delete(cacheName);
+        })
+      );
+      // console.log("Old cache removed");
+    })
+  );
 });
 
+self.addEventListener('fetch', function(event) {
+  // console.log("Service Worker starting fetch");
+  event.respondWith(
+    caches.open(staticCacheName).then(function(cache) {
+      return cache.match(event.request).then(function (response) {
+        if (response) {
+          // console.log("data fetched from cache");
+          return response;
+        }
+        else {
+          return fetch(event.request).then(function(networkResponse) {
+            // console.log("data fetched from network", event.request.url);
+            //cache.put(event.request, networkResponse.clone());
+            return networkResponse;
+          }).catch(function(error) {
+            console.log("Unable to fetch data from network", event.request.url, error);
+          });
+        }
+      });
+    }).catch(function(error) {
+      console.log("Something went wrong with Service Worker fetch intercept", error);
+    })
+  );
+});
